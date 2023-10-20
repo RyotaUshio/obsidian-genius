@@ -1,3 +1,7 @@
 .genius-icon-container {
     display: flex;
 }
+
+.genius-verified {
+    background-color: var(--interactive-accent);
+}
