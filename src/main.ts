@@ -1,26 +1,18 @@
-import { MarkdownView, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, requestUrl } from 'obsidian';
-import { getAPI } from 'obsidian-dataview';
+import { MarkdownView, Plugin, WorkspaceLeaf, requestUrl } from 'obsidian';
+import { getAPI, isPluginEnabled } from 'obsidian-dataview';
 import { GeniusSearchModal } from './search';
 import { GeniusEvents } from './events';
 import { GeniusAnnotationView, VIEW_TYPE } from './view';
 import { toQueryString } from './utils';
-
-
-interface GeniusPluginSettings {
-	userSpecific: boolean;
-}
-
-const DEFAULT_SETTINGS: GeniusPluginSettings = {
-	userSpecific: false,
-}
-
-const CLIENT_ACCESS_TOKEN = 'Xx_LtOeqSGInzY9PHikv3FAVM_McKL6nth3t2YDDTfD_fx6ILPF6bkxu0NX-o-4T';
+import { GeniusPluginSettingTab, GeniusPluginSettings, DEFAULT_SETTINGS, CLIENT_ACCESS_TOKEN } from './settings';
+import { TemplateProcessor } from './template';
 
 
 export default class GeniusPlugin extends Plugin {
 	settings: GeniusPluginSettings;
 	#accessToken: string = CLIENT_ACCESS_TOKEN;
 	events: GeniusEvents = new GeniusEvents();
+	templateProcessor: TemplateProcessor = new TemplateProcessor(this);
 
 	async onload() {
 		await this.loadSettings();
@@ -35,26 +27,20 @@ export default class GeniusPlugin extends Plugin {
 			VIEW_TYPE,
 			(leaf) => new GeniusAnnotationView(leaf, this)
 		);
-		// this.registerEvent(
-		// 	this.events.on('song-selected', (song) => {
-		// 		console.log(song);
-		// 	})
-		// )
 		this.registerEvent(
 			this.app.workspace.on('active-leaf-change', async leaf => {
 				if (leaf?.view instanceof MarkdownView && leaf.view.file) {
-					const dv = getAPI(this.app);
-					const id = dv.page(leaf.view.file.path)?.['genius-id'];
-					if (id) {
-						const leaf = await this.getGeniusLeaf();
-						if (leaf.view instanceof GeniusAnnotationView) {
-							const res = await this.makeRequest(`/songs/${id}`);
-							leaf.view.song = res.json.response.song;
-						}
-					}
+					await this.loadGeniusFromPath(leaf.view.file.path);
 				}
 			})
 		);
+
+		this.app.workspace.onLayoutReady(() => {
+			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (view?.file) {
+				this.loadGeniusFromPath(view.file.path);
+			}
+		});
 	}
 
 	onunload() {
@@ -86,6 +72,26 @@ export default class GeniusPlugin extends Plugin {
 				this.events.trigger('song-selected', { full_title: 'test' });
 			}
 		})
+	}
+
+	getGeniusIdFromPath(path: string) {
+		if (isPluginEnabled(this.app)) {
+			const dv = getAPI(this.app);
+			const id = dv.page(path)?.['genius-id'];
+			return id;
+		}
+		const id = this.app.metadataCache.getCache(path)?.frontmatter?.['genius-id'];
+		return id;
+	}
+
+	async loadGeniusFromPath(path: string) {
+		const id = this.getGeniusIdFromPath(path);
+		if (id) {
+			const [leaf, res] = await Promise.all([this.getGeniusLeaf(), this.makeRequest(`/songs/${id}`)]);
+			if (leaf.view instanceof GeniusAnnotationView) {
+				leaf.view.song = res.json.response.song;
+			}
+		}
 	}
 
 	async getGeniusLeaf(): Promise<WorkspaceLeaf> {
@@ -151,30 +157,5 @@ export default class GeniusPlugin extends Plugin {
 			headers: { Authorization: `Bearer ${this.#accessToken}` }
 		});
 		return res;
-	}
-}
-
-
-class GeniusPluginSettingTab extends PluginSettingTab {
-	constructor(public plugin: GeniusPlugin) {
-		super(plugin.app, plugin);
-	}
-
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('User specific access')
-			.setDesc("Need user-specific behaviors?")
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.userSpecific)
-				.onChange(async (value) => {
-					this.plugin.settings.userSpecific = value;
-					await this.plugin.saveSettings();
-					if (value) {
-						await this.plugin.auth();
-					}
-				}));
 	}
 }
