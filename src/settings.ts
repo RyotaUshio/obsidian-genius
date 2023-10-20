@@ -2,20 +2,18 @@ import { PluginSettingTab, Setting } from "obsidian";
 import GeniusPlugin from "./main";
 
 export interface GeniusPluginSettings {
-    userSpecific: boolean;
     accessToken: string;
     template?: string;
     folder: string;
     clearCacheOnUnload: boolean;
+    linkToNote: boolean;
 }
 
-export const CLIENT_ACCESS_TOKEN = 'Xx_LtOeqSGInzY9PHikv3FAVM_McKL6nth3t2YDDTfD_fx6ILPF6bkxu0NX-o-4T';
-
 export const DEFAULT_SETTINGS: GeniusPluginSettings = {
-    userSpecific: false,
-    accessToken: CLIENT_ACCESS_TOKEN,
+    accessToken: '',
     folder: '',
     clearCacheOnUnload: true,
+    linkToNote: true,
 }
 
 
@@ -27,19 +25,6 @@ export class GeniusPluginSettingTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-
-        new Setting(containerEl)
-            .setName('User specific access')
-            .setDesc("Need user-specific behaviors?")
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.userSpecific)
-                .onChange(async (value) => {
-                    this.plugin.settings.userSpecific = value;
-                    await this.plugin.saveSettings();
-                    if (value) {
-                        await this.plugin.auth();
-                    }
-                }));
 
         new Setting(containerEl)
             .setName('Access token')

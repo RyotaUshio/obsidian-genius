@@ -20,7 +20,7 @@ export class GeniusSearchModal extends SuggestModal<SongSimplified> {
 
     async getSuggestions(query: string) {
         const res = await this.plugin.makeRequest('/search', { q: query });
-        let songs = (res.json.response.hits as GeniusSearchResultItem[]).map(item => item.result);
+        let songs = (res?.json.response.hits as GeniusSearchResultItem[]).map(item => item.result);
         return songs;
     }
 

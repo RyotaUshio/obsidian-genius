@@ -1,4 +1,3 @@
-import { create } from "domain";
 import { GeniusDOM } from "./types";
 
 export function toQueryString(obj: Record<string, string>) {

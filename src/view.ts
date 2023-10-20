@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf, requestUrl, request, App, Component } from "obsidian";
+import { ItemView, WorkspaceLeaf, requestUrl, request, Component } from "obsidian";
 import { Song } from "./types";
 import GeniusPlugin from "./main";
 import { renderDOM } from "./utils";
@@ -22,10 +22,10 @@ export class GeniusAnnotationView extends ItemView {
         if (songSimplified) {
             (async () => {
                 const res = await this.plugin.makeRequest(songSimplified.api_path);
-                // @ts-ignore
-                window.song = res.json.response.song;
-                this._song = res.json.response.song;
-                this.onOpen();
+                if (res?.json.response.song) {
+                    this._song = res.json.response.song;
+                    this.onOpen();
+                }
             })();
         }
     }
@@ -58,7 +58,7 @@ export class GeniusAnnotationView extends ItemView {
         iconContainer.appendChild(
             this.addAction('external-link', 'View on genius.com', () => {
                 if (!this.song) {
-                    new Notice('No song selected');
+                    this.plugin.notify('No song selected');
                     return;
                 }
                 self.open(this.song.url, '_blank');
@@ -67,14 +67,14 @@ export class GeniusAnnotationView extends ItemView {
         iconContainer.appendChild(
             this.addAction('youtube', 'Listen in YouTube', () => {
                 if (!this.song) {
-                    new Notice('No song selected');
+                    this.plugin.notify('No song selected');
                     return;
                 }
                 const url = this.song.media.find((item: any) => item.provider == 'youtube')?.url
                 if (url) {
                     self.open(url, '_blank');
                 } else {
-                    new Notice('No YouTube link found');
+                    this.plugin.notify('No YouTube link found');
                 }
             })
         );
@@ -99,7 +99,7 @@ export class GeniusAnnotationView extends ItemView {
             }
             el.appendChild(renderDOM(this.song.description.dom))
         } else {
-            new Notice('No song selected');
+            this.plugin.notify('No song selected');
         }
     }
 
@@ -114,7 +114,7 @@ export class GeniusAnnotationView extends ItemView {
                 const referentIds = res.match(pattern)?.[1]?.split(',');
                 referents = await Promise.all(referentIds?.map(async id => {
                     const res = await this.plugin.makeRequest('/referents/' + id);
-                    const referent = res.json.response.referent;
+                    const referent = res!.json.response.referent;
                     return referent;
                 }) ?? []);
                 this.plugin.cache.set(this.song, { referents });
@@ -137,7 +137,7 @@ export class GeniusAnnotationView extends ItemView {
                 itemEl.appendChild(annotationEl);
             }
         } else {
-            new Notice('No song selected');
+            this.plugin.notify('No song selected');
         }
     }
 }

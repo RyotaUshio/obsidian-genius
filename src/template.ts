@@ -28,7 +28,7 @@ export class TemplateProcessor {
         const { app } = this.plugin;
         const template = await this.readTemplate();
         if (template === null) {
-            new Notice('Template not found');
+            this.plugin.notify('Template not found');
             return null;
         }
 
