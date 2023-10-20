@@ -1,4 +1,9 @@
-import { Plugin, PluginSettingTab, Setting, requestUrl } from 'obsidian';
+import { MarkdownView, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, requestUrl } from 'obsidian';
+import { getAPI } from 'obsidian-dataview';
+import { GeniusSearchModal } from './search';
+import { GeniusEvents } from './events';
+import { GeniusAnnotationView, VIEW_TYPE } from './view';
+import { toQueryString } from './utils';
 
 
 interface GeniusPluginSettings {
@@ -14,16 +19,42 @@ const CLIENT_ACCESS_TOKEN = 'Xx_LtOeqSGInzY9PHikv3FAVM_McKL6nth3t2YDDTfD_fx6ILPF
 
 export default class GeniusPlugin extends Plugin {
 	settings: GeniusPluginSettings;
-	accessToken: string = CLIENT_ACCESS_TOKEN;
+	#accessToken: string = CLIENT_ACCESS_TOKEN;
+	events: GeniusEvents = new GeniusEvents();
 
 	async onload() {
 		await this.loadSettings();
 		await this.saveSettings();
 		this.addSettingTab(new GeniusPluginSettingTab(this));
+		this.registerCommands();
 		this.registerAuthCodeHandler();
 		if (this.settings.userSpecific) {
 			await this.auth();
 		}
+		this.registerView(
+			VIEW_TYPE,
+			(leaf) => new GeniusAnnotationView(leaf, this)
+		);
+		// this.registerEvent(
+		// 	this.events.on('song-selected', (song) => {
+		// 		console.log(song);
+		// 	})
+		// )
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', async leaf => {
+				if (leaf?.view instanceof MarkdownView && leaf.view.file) {
+					const dv = getAPI(this.app);
+					const id = dv.page(leaf.view.file.path)?.['genius-id'];
+					if (id) {
+						const leaf = await this.getGeniusLeaf();
+						if (leaf.view instanceof GeniusAnnotationView) {
+							const res = await this.makeRequest(`/songs/${id}`);
+							leaf.view.song = res.json.response.song;
+						}
+					}
+				}
+			})
+		);
 	}
 
 	onunload() {
@@ -36,6 +67,44 @@ export default class GeniusPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	registerCommands() {
+		this.addCommand({
+			id: 'search',
+			name: 'Search',
+			callback: () => {
+				const modal = new GeniusSearchModal(this);
+				modal.open();
+			}
+		})
+
+		this.addCommand({
+			id: 'test',
+			name: 'Test',
+			callback: () => {
+				this.events.trigger('song-selected', { full_title: 'test' });
+			}
+		})
+	}
+
+	async getGeniusLeaf(): Promise<WorkspaceLeaf> {
+		let { workspace } = this.app;
+
+		let leaf: WorkspaceLeaf | null = null;
+		let leaves = workspace.getLeavesOfType(VIEW_TYPE);
+
+		if (leaves.length > 0) {
+			// A leaf with our view already exists, use that
+			leaf = leaves[0];
+		} else {
+			// Our view could not be found in the workspace, create a new leaf
+			// in the right sidebar for it
+			leaf = workspace.getRightLeaf(false);
+			await leaf.setViewState({ type: VIEW_TYPE, active: true });
+		}
+
+		return leaf;
 	}
 
 	async auth() {
@@ -67,15 +136,21 @@ export default class GeniusPlugin extends Plugin {
 				method: 'POST',
 				body: toQueryString(queryParams)
 			})
-			this.accessToken = res.json.access_token;
+			this.#accessToken = res.json.access_token;
 		})
 	}
 
-	async makeRequest(endpoint: string) {
-		await requestUrl({
-			url: `https://api.genius.com/${endpoint}`,
-			headers: { Authorization: `Bearer ${this.accessToken}` }
+	async makeRequest(endpoint: string, params?: any) {
+		endpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+		let url = `https://api.genius.com${endpoint}`;
+		if (params) {
+			url += '?' + toQueryString(params);
+		}
+		const res = await requestUrl({
+			url,
+			headers: { Authorization: `Bearer ${this.#accessToken}` }
 		});
+		return res;
 	}
 }
 
@@ -102,8 +177,4 @@ class GeniusPluginSettingTab extends PluginSettingTab {
 					}
 				}));
 	}
-}
-
-function toQueryString(obj: any) {
-	return Object.entries(obj).map(([key, val]) => `${key}=${val}`).join('&');
 }
