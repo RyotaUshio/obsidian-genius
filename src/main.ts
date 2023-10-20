@@ -2,7 +2,7 @@ import { MarkdownView, Plugin, WorkspaceLeaf, requestUrl } from 'obsidian';
 import { getAPI, isPluginEnabled } from 'obsidian-dataview';
 import { GeniusSearchModal } from './search';
 import { GeniusEvents } from './events';
-import { GeniusAnnotationView, VIEW_TYPE } from './view';
+import { GeniusAnnotationView, GeniusCache, VIEW_TYPE } from './view';
 import { toQueryString } from './utils';
 import { GeniusPluginSettingTab, GeniusPluginSettings, DEFAULT_SETTINGS, CLIENT_ACCESS_TOKEN } from './settings';
 import { TemplateProcessor } from './template';
@@ -13,11 +13,14 @@ export default class GeniusPlugin extends Plugin {
 	#accessToken: string = CLIENT_ACCESS_TOKEN;
 	events: GeniusEvents = new GeniusEvents();
 	templateProcessor: TemplateProcessor = new TemplateProcessor(this);
+	cache: GeniusCache;
 
 	async onload() {
 		await this.loadSettings();
 		await this.saveSettings();
 		this.addSettingTab(new GeniusPluginSettingTab(this));
+		this.cache = new GeniusCache(this);
+		this.addChild(this.cache);
 		this.registerCommands();
 		this.registerAuthCodeHandler();
 		if (this.settings.userSpecific) {
