@@ -74,21 +74,49 @@ export class GeniusAnnotationView extends ItemView {
                 self.open(this.song.url, '_blank');
             })
         );
+
+        const openMedia = (providerName: string, messageWhenFailed: string) => {
+            if (!this.song) {
+                this.plugin.notify('No song selected');
+                return;
+            }
+            const url = this.song.media.find((item: any) => item.provider == providerName)?.url
+            if (url) {
+                self.open(url, '_blank');
+            } else {
+                this.plugin.notify(messageWhenFailed);
+            }
+        };
+
         iconContainer.appendChild(
-            this.addAction('youtube', 'Listen in YouTube', () => {
+            this.addAction('youtube', 'Listen on YouTube', () => openMedia('youtube', 'No YouTube link found'))
+        );
+        iconContainer.appendChild(
+            this.addAction('cloud', 'Listen on SoundCloud', () => openMedia('soundcloud', 'No SoundCloud link found'))
+        );
+
+        iconContainer.appendChild(
+            this.addAction('music', 'Listen on Spotify', () => {
+                if (!(this.app as any).plugins.enabledPlugins.has('spotify')) {
+                    this.plugin.notify('Spotify plugin not enabled');
+                    return;
+                }
+
                 if (!this.song) {
                     this.plugin.notify('No song selected');
                     return;
                 }
-                const url = this.song.media.find((item: any) => item.provider == 'youtube')?.url
-                if (url) {
-                    self.open(url, '_blank');
+                const spotifyUri = this.song.media.find((item: any) => item.provider == 'spotify')?.native_uri
+                const spotifyPlugin = (this.app as any).plugins.plugins.spotify;
+                if (spotifyUri && spotifyPlugin) {
+                    console.log(spotifyUri);
+                    spotifyPlugin.startResumePlayback(undefined, [spotifyUri]);
                 } else {
-                    this.plugin.notify('No YouTube link found');
+                    this.plugin.notify('No Spotify URI found');
                 }
+
             })
         );
-
     }
 
     async renderDescription(el: HTMLElement) {
