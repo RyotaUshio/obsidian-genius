@@ -2,6 +2,25 @@
     display: flex;
 }
 
-.genius-verified {
-    background-color: var(--interactive-accent);
+.genius-annotation-item {
+    padding: auto;
+    margin-bottom: 1rem;
+}
+
+.genius-annotation-item * {
+    max-width: 100%;
+    height: auto;
+}
+
+.genius-annotation-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.genius-annotation-fragment-container {
+    background-color: var(--text-highlight-bg);
+}
+
+.genius-song-art-image {
+    width: 80%;
+    height: auto;
 }

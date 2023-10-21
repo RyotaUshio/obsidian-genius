@@ -1,7 +1,6 @@
-import { ItemView, WorkspaceLeaf, requestUrl, request, Component } from "obsidian";
+import { ItemView, WorkspaceLeaf, requestUrl, Component, setIcon } from "obsidian";
 import { Song } from "./types";
 import GeniusPlugin from "./main";
-import { renderDOM } from "./utils";
 
 export const VIEW_TYPE = "genius-annotation";
 
@@ -18,13 +17,15 @@ export class GeniusAnnotationView extends ItemView {
     }
 
     set song(songSimplified: Song | null) {
+        if (JSON.stringify(songSimplified) == JSON.stringify(this._song)) return;
         this._song = songSimplified;
         if (songSimplified) {
             (async () => {
-                const res = await this.plugin.makeRequest(songSimplified.api_path);
-                if (res?.json.response.song) {
-                    this._song = res.json.response.song;
+                const song = await this.plugin.getSong(songSimplified.id);
+                if (song) {
+                    this._song = song;
                     this.onOpen();
+                    await this.plugin.getAllReferents(song);
                 }
             })();
         }
@@ -43,16 +44,25 @@ export class GeniusAnnotationView extends ItemView {
         contentEl.empty();
         const iconContainer = contentEl.createDiv({ cls: 'genius-icon-container' });
         const el = contentEl.createDiv();
+        el.addClasses(['markdown-rendered', 'markdown-preview-view'])
         this.renderDescription(el);
 
         iconContainer.appendChild(
             this.addAction('book', 'Show Description', () => {
-                this.renderDescription(el);
+                if (this.song) {
+                    this.renderDescription(el);
+                } else {
+                    this.plugin.notify('No song selected');
+                }
             })
         );
         iconContainer.appendChild(
             this.addAction('pencil', 'Show Annotations', () => {
-                this.renderAnnotations(el);
+                if (this.song) {
+                    this.renderAnnotations(el);
+                } else {
+                    this.plugin.notify('No song selected');
+                }
             })
         );
         iconContainer.appendChild(
@@ -85,65 +95,65 @@ export class GeniusAnnotationView extends ItemView {
         el.empty();
 
         if (this.song) {
-            let url = this.plugin.cache.get(this.song)?.imageUrl;
+            let url = this.plugin.cache.get(this.song.id)?.imageUrl;
             if (!url) {
                 const res = await requestUrl(this.song.song_art_image_url)
                 if (res.headers['content-type'].startsWith('image')) {
                     const blob = new Blob([res.arrayBuffer], { type: res.headers['content-type'] });
                     url = URL.createObjectURL(blob);
-                    this.plugin.cache.set(this.song, { imageUrl: url });
+                    this.plugin.cache.set(this.song.id, { imageUrl: url });
                 }
             }
             if (url) {
-                el.createEl('img', { attr: { src: url } });
+                el.createEl('img', {
+                    attr: { src: url },
+                    cls: 'genius-song-art-image'
+                });
             }
-            el.appendChild(renderDOM(this.song.description.dom))
-        } else {
-            this.plugin.notify('No song selected');
+            el.createDiv().innerHTML = this.song.description.html;
         }
     }
 
     async renderAnnotations(el: HTMLElement) {
         el.empty();
         if (this.song) {
-            let referents = this.plugin.cache.get(this.song)?.referents;
-            if (!referents) {
-                el.createDiv({ text: 'Loading annotations...' });
-                const res = await request(this.song.url);
-                const pattern = /"referents\\"\:\[(\d+(,\d+)*)\]/
-                const referentIds = res.match(pattern)?.[1]?.split(',');
-                referents = await Promise.all(referentIds?.map(async id => {
-                    const res = await this.plugin.makeRequest('/referents/' + id);
-                    const referent = res!.json.response.referent;
-                    return referent;
-                }) ?? []);
-                this.plugin.cache.set(this.song, { referents });
-            }
+            el.createDiv({ text: 'Loading annotations...' });
+            const { referents, referentOrder } = await this.plugin.getAllReferents(this.song);
 
             el.empty();
 
-            for (const referent of referents) {
+            for (const referentId of referentOrder) {
+                const referent = referents[referentId];
+                if (!referent) {
+                    console.log(referentId);
+                    continue;
+                }
                 const annotation = referent.annotations[0];
                 const itemEl = el.createDiv({ cls: 'genius-annotation-item' });
-                const fragmentEl = createDiv({
-                    text: referent.fragment,
-                    cls: ['genius-annotation-fragment']
+                const fragmentContainer = itemEl.createDiv({
+                    cls: 'genius-annotation-fragment-container'
                 })
+                const fragmentInner = fragmentContainer.createDiv({
+                    text: referent.fragment,
+                    cls: 'genius-annotation-fragment-inner'
+                });
                 if (annotation?.verified) {
-                    fragmentEl.addClass('genius-verified')
+                    fragmentContainer.addClass('genius-annotation-verifed');
+                    const verifiedIcon = fragmentContainer.createDiv({
+                        cls: 'genius-annotation-verified-icon',
+                    })
+                    setIcon(verifiedIcon, 'checkmark');
+                    fragmentContainer.insertBefore(verifiedIcon, fragmentInner);
                 }
-                itemEl.appendChild(fragmentEl);
-                const annotationEl = renderDOM(annotation?.body.dom);
-                itemEl.appendChild(annotationEl);
+
+                itemEl.createDiv().innerHTML = annotation?.body.html;
             }
-        } else {
-            this.plugin.notify('No song selected');
         }
     }
 }
 
 
-export type GeniusCacheItem = { imageUrl?: string, description: any, referents: any[] };
+export type GeniusCacheItem = { imageUrl?: string, song: Song, referents: Record<number, any>, referentOrder: number[] };
 
 export class GeniusCache extends Component {
     constructor(public plugin: GeniusPlugin) {
@@ -162,14 +172,14 @@ export class GeniusCache extends Component {
         this.plugin.app.saveLocalStorage('genius-cache', null);
     }
 
-    get(song: Song): GeniusCacheItem | null {
+    get(id: number): GeniusCacheItem | null {
         const cache = this.read();
-        return cache[song.id] ?? null;
+        return cache[id] ?? null;
     }
 
-    set(song: Song, data: Partial<GeniusCacheItem>): void {
+    set(id: number, data: Partial<GeniusCacheItem>): void {
         const cache = this.read();
-        cache[song.id] = Object.assign({}, cache[song.id], data);
+        cache[id] = Object.assign({}, cache[id], data);
         this.write(cache);
     }
 
@@ -185,7 +195,7 @@ export class GeniusCache extends Component {
             return;
         }
         for (const id in cache) {
-            delete cache[id].imageUrl;
+            delete cache[id]["imageUrl"];
         }
         this.write(cache);
     }
