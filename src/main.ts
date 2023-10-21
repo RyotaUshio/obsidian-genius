@@ -5,7 +5,7 @@ import { GeniusAnnotationView, GeniusCache, VIEW_TYPE } from './view';
 import { toQueryString } from './utils';
 import { GeniusPluginSettingTab, GeniusPluginSettings, DEFAULT_SETTINGS } from './settings';
 import { TemplateProcessor } from './template';
-import { Song } from './types';
+import { GeniusPluginError, Song } from './types';
 
 
 export default class GeniusPlugin extends Plugin {
@@ -60,7 +60,7 @@ export default class GeniusPlugin extends Plugin {
 				const modal = new GeniusSearchModal(this);
 				modal.open();
 			}
-		})
+		});
 	}
 
 	getGeniusIdFromPath(path: string) {
@@ -74,6 +74,9 @@ export default class GeniusPlugin extends Plugin {
 	}
 
 	async loadGeniusFromPath(path: string) {
+		if (this.settings.template == path) {
+			return;
+		}
 		const id = this.getGeniusIdFromPath(path);
 		if (id) {
 			const [leaf, song] = await Promise.all([

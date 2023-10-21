@@ -4,6 +4,7 @@ import GeniusPlugin from "./main";
 export interface GeniusPluginSettings {
     accessToken: string;
     template?: string;
+    noteTitleTemplate: string;
     folder: string;
     clearCacheOnUnload: boolean;
     linkToNote: boolean;
@@ -11,6 +12,7 @@ export interface GeniusPluginSettings {
 
 export const DEFAULT_SETTINGS: GeniusPluginSettings = {
     accessToken: '',
+    noteTitleTemplate: '{{full_title}}',
     folder: '',
     clearCacheOnUnload: true,
     linkToNote: true,
@@ -45,6 +47,17 @@ export class GeniusPluginSettingTab extends PluginSettingTab {
                     this.plugin.settings.template = file.path;
                     await this.plugin.saveSettings();
                 })
+            });
+
+        new Setting(containerEl)
+            .setName('Note title template')
+            .setDesc("")
+            .addText(toggle => {
+                toggle.setValue(this.plugin.settings.noteTitleTemplate)
+                    .onChange(async (value) => {
+                        this.plugin.settings.noteTitleTemplate = value;
+                        await this.plugin.saveSettings();
+                    })
             });
 
         new Setting(containerEl)

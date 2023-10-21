@@ -13,7 +13,6 @@ export class GeniusSearchModal extends SuggestModal<SongSimplified> {
             { command: '↑↓', purpose: 'to navigate' },
             { command: '↵', purpose: 'to open in sidebar' },
             { command: 'cmd+↵', purpose: 'to open in genius.com' },
-            { command: 'shift+↵', purpose: 'to create note' }
         ])
         this.setPlaceholder('Search genius.com...');
     }
@@ -35,12 +34,6 @@ export class GeniusSearchModal extends SuggestModal<SongSimplified> {
             const leaf = await this.plugin.getGeniusLeaf();
             if (leaf.view instanceof GeniusAnnotationView) {
                 leaf.view.song = song;
-            }
-            if (ev.shiftKey) {
-                const file = await this.plugin.templateProcessor.createFileFromTemplate(song);
-                if (file) {
-                    await this.plugin.app.workspace.getLeaf().openFile(file);
-                }
             }
         } else {
             self.open(song.url);

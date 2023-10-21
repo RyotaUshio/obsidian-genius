@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, requestUrl, Component, setIcon } from "obsidian";
+import { ItemView, WorkspaceLeaf, requestUrl, Component, setIcon, Menu } from "obsidian";
 import { Song } from "./types";
 import GeniusPlugin from "./main";
 
@@ -9,7 +9,10 @@ export class GeniusAnnotationView extends ItemView {
 
     constructor(leaf: WorkspaceLeaf, public plugin: GeniusPlugin) {
         super(leaf);
-        this.icon = 'headphones';
+    }
+
+    getIcon(): string {
+        return 'headphones';
     }
 
     get song() {
@@ -115,6 +118,32 @@ export class GeniusAnnotationView extends ItemView {
                     this.plugin.notify('No Spotify URI found');
                 }
 
+            })
+        );
+
+        iconContainer.appendChild(
+            this.addAction('sticky-note', 'Open (or create) song note', async () => {
+                if (this.song) {
+                    const file = await this.plugin.templateProcessor.createFileFromTemplate(this.song);
+                    if (!file) {
+                        this.plugin.notify('Failed to create note');
+                        return;
+                    }
+                    await this.app.workspace.getLeaf().openFile(file);
+                } else {
+                    this.plugin.notify('No song selected');
+                }
+            })
+        );
+
+        iconContainer.appendChild(
+            this.addAction('percent', 'Show available variables for template', () => {
+                if (this.song) {
+                    console.log(this.song);
+                    this.plugin.notify('Song info has been logged to the developer console.');
+                } else {
+                    this.plugin.notify('No song selected');
+                }
             })
         );
     }

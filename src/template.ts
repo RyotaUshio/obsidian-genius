@@ -20,7 +20,9 @@ export class TemplateProcessor {
     }
 
     processTemplate(data: string, song: Song): string {
-        return data.replace(/\{\{(.*?)\}\}/gi, (match, attr) => eval(`(song) => String(song.${attr})`)(song));
+        return data.replace(/\{\{(.*?)\}\}/gi, (match, attr) => {
+            return eval(`(song) => String(song.${attr})`)(song);
+        });
     }
 
     async createFileFromTemplate(song: Song) {
@@ -31,15 +33,16 @@ export class TemplateProcessor {
             return null;
         }
 
-        const data = this.processTemplate(template, song);
+        const content = this.processTemplate(template, song);
+
+        let title = this.processTemplate(this.plugin.settings.noteTitleTemplate, song);
+        title = title.endsWith('.md') ? title : title + '.md';
 
         const sourcePath = app.workspace.getActiveFile()?.path ?? '';
         const newFileFolderPath = this.plugin.settings.folder || app.fileManager.getNewFileParent(sourcePath).path;
-        // @ts-ignore
-        const newFilePath = app.vault.getAvailablePath(
-            normalizePath(newFileFolderPath + '/' + song.title),
-            'md'
-        )
-        return await app.vault.create(newFilePath, data);
+        const newFilePath = normalizePath(newFileFolderPath + '/' + title);
+        const existingFile = app.vault.getAbstractFileByPath(newFilePath);
+        console.log(existingFile);
+        return existingFile instanceof TFile ? existingFile : await app.vault.create(newFilePath, content);
     }
 }

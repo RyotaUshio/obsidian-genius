@@ -82,3 +82,11 @@ declare module "obsidian" {
         loadLocalStorage(key: string): any;
     }
 }
+
+export class GeniusPluginError extends Error {
+    name = 'GeniusPluginError';
+    
+    constructor(message: string) {
+        super(message);
+    }
+}
