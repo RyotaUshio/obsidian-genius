@@ -1,4 +1,4 @@
-import { Notice, TFile, normalizePath } from "obsidian";
+import { TFile, normalizePath } from "obsidian";
 import GeniusPlugin from "./main";
 import { Song } from "./types";
 
@@ -20,8 +20,7 @@ export class TemplateProcessor {
     }
 
     processTemplate(data: string, song: Song): string {
-        return data
-            .replace(/\{\{ID\}\}/gi, `${song.id}`);
+        return data.replace(/\{\{(.*?)\}\}/gi, (match, attr) => eval(`(song) => String(song.${attr})`)(song));
     }
 
     async createFileFromTemplate(song: Song) {

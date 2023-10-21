@@ -40,25 +40,24 @@ export class GeniusPluginSettingTab extends PluginSettingTab {
             .setName('Template path')
             .setDesc("")
             .addText(toggle => {
-                new FileSuggest(this.app, toggle.inputEl);
-                toggle.setValue(this.plugin.settings.template ?? '')
-                    .onChange(async (value) => {
-                        this.plugin.settings.template = value;
-                        await this.plugin.saveSettings();
-                    })
+                toggle.setValue(this.plugin.settings.template ?? '');
+                new FileSuggest(this.app, toggle.inputEl, async (file) => {
+                    this.plugin.settings.template = file.path;
+                    await this.plugin.saveSettings();
+                })
             });
 
         new Setting(containerEl)
             .setName('New note folder path')
             .setDesc("leave it empty to respect app settings")
             .addText(toggle => {
-                new FolderSuggest(this.app, toggle.inputEl);
                 toggle
-                    .setValue(this.plugin.settings.folder ?? '')
-                    .onChange(async (value) => {
-                        this.plugin.settings.folder = value;
-                        await this.plugin.saveSettings();
-                    })
+                    .setValue(this.plugin.settings.folder ?? '');
+                new FolderSuggest(this.app, toggle.inputEl, async (folder) => {
+                    console.log('b');
+                    this.plugin.settings.folder = folder.path;
+                    await this.plugin.saveSettings();
+                })
             });
 
         new Setting(containerEl)
@@ -86,7 +85,7 @@ export class GeniusPluginSettingTab extends PluginSettingTab {
 
 
 abstract class AbstractFileSuggest<FileOrFolder extends TAbstractFile> extends AbstractInputSuggest<FileOrFolder> {
-    constructor(app: App, inputEl: HTMLInputElement) {
+    constructor(app: App, inputEl: HTMLInputElement, private onChange: (file: FileOrFolder) => any) {
         super(app, inputEl);
     }
 
@@ -96,6 +95,7 @@ abstract class AbstractFileSuggest<FileOrFolder extends TAbstractFile> extends A
 
     selectSuggestion(file: FileOrFolder, evt: MouseEvent | KeyboardEvent): void {
         this.setValue(file.path);
+        this.onChange(file);
     }
 }
 
